@@ -1,0 +1,39 @@
+<div class="controls no-print">
+  <input type="number" [(ngModel)]="selectedYear" placeholder="Year">
+  <input type="number" [(ngModel)]="selectedMonth" placeholder="Month">
+  <button (click)="loadReportData()">Update</button>
+
+  <button (click)="downloadRawData('excel')">Download Excel</button>
+  <button (click)="generatePDF()">Save as PDF</button>
+</div>
+
+<div class="pdf-report-container" *ngIf="reportData">
+  <header class="report-header">
+    <h1>AI Productivity & Efficiency Report</h1>
+    <h2>{{ selectedYear }} - {{ selectedMonth }}</h2>
+  </header>
+
+  <div class="metrics-grid">
+    <div class="kpi-card">
+      <span class="label">Total Prompts</span>
+      <span class="value">{{ reportData.totalPrompts }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="label">Total Spend</span>
+      <span class="value">${{ reportData.totalCost | number:'1.2-4' }}</span>
+    </div>
+    <div class="kpi-card">
+      <span class="label">Avg Gen Ratio</span>
+      <span class="value">{{ reportData.avgGenRatio }}%</span>
+    </div>
+  </div>
+
+  <div class="trend-section">
+    <h3>Daily Token Usage</h3>
+    <ul>
+      <li *ngFor="let day of reportData.dailyTrend">
+        {{ day.name }}: {{ day.value | number }} tokens
+      </li>
+    </ul>
+  </div>
+</div>

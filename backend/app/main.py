@@ -1,12 +1,12 @@
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import httpx
 import json
 import time
 from .services.database import Database
 from .services.gatekeeper import estimate_tokens, calculate_estimated_cost, format_error_response
 from .services.tracking import extract_token_usage, calculate_cost, calculate_productivity_metrics
-from .api.routes import projects, logs
+from .routes import projects, logs, export
 import os
 
 app = FastAPI(title="Token Tracker Gatekeeper Proxy")
@@ -17,11 +17,12 @@ http_client = httpx.AsyncClient()
 
 app.include_router(projects.router, prefix="/v1")
 app.include_router(logs.router, prefix="/v1")
+app.include_router(export.router, prefix="/v1")
 
 PROVIDERS_URLS = {
     "anthropic": "https://api.anthropic.com",
     "gemini": "https://generativelanguage.googleapis.com",
-    "kiro": "https://generativelanguage.googleapis.com", # Kiro routes to Gemini/AWS
+    "kiro": "https://generativelanguage.googleapis.com",
     "antigravity": "https://api.antigravity.ai"
 }
 
@@ -47,11 +48,12 @@ async def proxy_interceptor(request: Request, path: str):
     source = request.headers.get("X-Source", "unknown")
     session_id_header = request.headers.get("X-Session-Id")
 
+    body = {}
     if request.method == "POST":
         try:
             body = await request.json()
         except:
-            body = {}
+            pass
 
         model = body.get("model", "unknown")
         estimated_input_tokens = estimate_tokens(body)
@@ -65,10 +67,7 @@ async def proxy_interceptor(request: Request, path: str):
                 project_id=project_id, provider=provider, model=model,
                 was_blocked=True, block_reason=reason, metadata=body
             )
-            return JSONResponse(
-                status_code=429,
-                content=format_error_response(provider, reason)
-            )
+            return JSONResponse(status_code=429, content=format_error_response(provider, reason))
 
     # Get or create session
     session_uuid = await db.get_or_create_session(project_id, source, session_id_header)
@@ -79,13 +78,30 @@ async def proxy_interceptor(request: Request, path: str):
 
     start_time = time.time()
 
-    content = await request.body()
+    is_stream = body.get("stream", False)
+
+    if is_stream:
+        async def stream_generator():
+            async with http_client.stream(
+                method=request.method,
+                url=target_url,
+                headers=headers,
+                content=await request.body(),
+                params=request.query_params,
+                timeout=60.0
+            ) as response:
+                # Basic logging for streaming could be added here by accumulating chunks
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
     try:
         response = await http_client.request(
             method=request.method,
             url=target_url,
             headers=headers,
-            content=content,
+            content=await request.body(),
             params=request.query_params,
             timeout=60.0
         )
@@ -100,8 +116,6 @@ async def proxy_interceptor(request: Request, path: str):
             input_tokens, output_tokens = extract_token_usage(provider, resp_data)
             actual_input_cost, actual_output_cost = calculate_cost(provider, model, input_tokens, output_tokens)
             total_cost = float(actual_input_cost + actual_output_cost)
-
-            # Productivity Metrics
             prod_metrics = calculate_productivity_metrics(provider, resp_data, input_tokens, output_tokens)
 
             await db.log_request(

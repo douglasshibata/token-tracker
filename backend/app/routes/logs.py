@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from typing import List, Dict, Any
+from datetime import datetime
 from ..services.database import Database
 from uuid import UUID
 
@@ -63,4 +64,40 @@ async def get_productivity(project_id: UUID):
         return {
             "stats": dict(stats) if stats else {},
             "top_tools": [dict(r) for r in tool_rows]
+        }
+
+@router.get("/summary/{project_id}")
+async def get_summary(project_id: UUID, year: int, month: int):
+    if not db.pool: await db.connect()
+    start_date = datetime(year, month, 1)
+    if month == 12:
+        end_date = datetime(year + 1, 1, 1)
+    else:
+        end_date = datetime(year, month + 1, 1)
+
+    async with db.pool.acquire() as conn:
+        stats = await conn.fetchrow("""
+            SELECT
+                COUNT(*) as total_prompts,
+                COALESCE(SUM(cost), 0) as total_cost,
+                COALESCE(AVG(generation_ratio), 0) as avg_gen_ratio
+            FROM api_logs
+            WHERE project_id = $1 AND created_at >= $2 AND created_at < $3
+        """, project_id, start_date, end_date)
+
+        daily_rows = await conn.fetch("""
+            SELECT
+                DATE(created_at) as date,
+                SUM(input_tokens + output_tokens) as tokens
+            FROM api_logs
+            WHERE project_id = $1 AND created_at >= $2 AND created_at < $3
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+        """, project_id, start_date, end_date)
+
+        return {
+            "totalPrompts": stats["total_prompts"],
+            "totalCost": round(float(stats["total_cost"]), 4),
+            "avgGenRatio": round(float(stats["avg_gen_ratio"]), 2),
+            "dailyTrend": [{"name": str(r["date"]), "value": r["tokens"]} for r in daily_rows]
         }
