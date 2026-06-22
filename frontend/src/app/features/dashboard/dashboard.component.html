@@ -1,0 +1,17 @@
+<div class="dashboard-grid">
+  <div class="stat-card">
+    <h3>Spent (Lifetime)</h3>
+    <p class="value">${{ stats.total_spend | number:'1.2-6' }}</p>
+  </div>
+
+  <div class="stat-card">
+    <h3>Total Tokens</h3>
+    <p class="value">{{ stats.total_tokens | number }}</p>
+  </div>
+
+  <div class="stat-card danger" [class.active]="stats.blocked_count > 0">
+    <h3>Blocked Requests</h3>
+    <p class="value">{{ stats.blocked_count }}</p>
+    <p class="sub">Stopped by Gatekeeper</p>
+  </div>
+</div>

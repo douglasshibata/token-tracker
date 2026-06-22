@@ -1,0 +1,21 @@
+<div class="blocked-list">
+  <h2>🚫 Intercepted Requests</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Provider</th>
+        <th>Model</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let log of blockedLogs">
+        <td>{{ log.created_at | date:'short' }}</td>
+        <td>{{ log.provider }}</td>
+        <td>{{ log.model }}</td>
+        <td class="reason">{{ log.block_reason }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

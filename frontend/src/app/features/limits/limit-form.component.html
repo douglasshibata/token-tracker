@@ -1,0 +1,28 @@
+<div class="limit-card">
+  <h2>🛑 Hard Limit Enforcement</h2>
+  <p class="warning-text">
+    Setting these limits will instantly block Claude CLI and Antigravity IDE requests
+    if the estimated cost pushes you over the limit.
+  </p>
+
+  <form [formGroup]="limitForm" (ngSubmit)="enforceLimits()">
+    <div class="form-group">
+      <label>Daily Limit ($)</label>
+      <input type="number" formControlName="daily_limit" placeholder="e.g. 5.00">
+    </div>
+
+    <div class="form-group">
+      <label>Monthly Limit ($)</label>
+      <input type="number" formControlName="monthly_limit" placeholder="e.g. 50.00">
+    </div>
+
+    <div class="form-group">
+      <label>Total Lifetime Limit ($)</label>
+      <input type="number" formControlName="total_limit" placeholder="e.g. 200.00">
+    </div>
+
+    <button type="submit" [disabled]="limitForm.invalid">
+      Activate Hard Limits
+    </button>
+  </form>
+</div>

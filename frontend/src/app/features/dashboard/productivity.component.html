@@ -1,0 +1,38 @@
+<div class="productivity-dashboard">
+  <h2>🚀 Productivity Metrics</h2>
+
+  <div class="metrics-grid">
+    <div class="metric-card">
+      <h3>Total Prompts</h3>
+      <div class="value">{{ stats.total_prompts }}</div>
+      <div class="subtext">AI interactions in this project</div>
+    </div>
+
+    <div class="metric-card highlight">
+      <h3>Generation Ratio</h3>
+      <div class="value">{{ stats.avg_generation_ratio | number:'1.1-2' }}%</div>
+      <div class="subtext">{{ getEfficiencyLabel(stats.avg_generation_ratio) }}</div>
+    </div>
+
+    <div class="metric-card">
+      <h3>Cost Per Prompt</h3>
+      <div class="value">${{ stats.cost_per_prompt | number:'1.4-4' }}</div>
+    </div>
+
+    <div class="metric-card">
+      <h3>Actionable Output</h3>
+      <div class="value">{{ stats.code_vs_chat_percentage | number:'1.1-1' }}%</div>
+      <div class="subtext">Prompts resulting in tool calls</div>
+    </div>
+  </div>
+
+  <div class="tools-section">
+    <h3>Top AI Actions</h3>
+    <ul>
+      <li *ngFor="let tool of topTools">
+        <span class="tool-name">{{ tool.tool_name }}</span>:
+        <span class="tool-count">{{ tool.count }} times</span>
+      </li>
+    </ul>
+  </div>
+</div>
