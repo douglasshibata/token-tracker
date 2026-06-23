@@ -8,6 +8,8 @@ import { AppComponent } from './app.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
 import { ProductivityComponent } from './features/dashboard/productivity.component';
 import { MonthlyReportComponent } from './features/dashboard/monthly-report.component';
+import { RequestLogsComponent } from './features/dashboard/request-logs.component';
+import { CoverageAnalysisComponent } from './features/dashboard/coverage-analysis.component';
 import { LimitFormComponent } from './features/limits/limit-form.component';
 import { BlockedRequestsComponent } from './features/blocked-requests/blocked-list.component';
 
@@ -16,6 +18,8 @@ const routes: Routes = [
   { path: 'dashboard', component: DashboardComponent },
   { path: 'productivity', component: ProductivityComponent },
   { path: 'report', component: MonthlyReportComponent },
+  { path: 'coverage', component: CoverageAnalysisComponent },
+  { path: 'logs', component: RequestLogsComponent },
   { path: 'limits', component: LimitFormComponent },
   { path: 'blocked', component: BlockedRequestsComponent }
 ];
@@ -26,6 +30,8 @@ const routes: Routes = [
     DashboardComponent,
     ProductivityComponent,
     MonthlyReportComponent,
+    RequestLogsComponent,
+    CoverageAnalysisComponent,
     LimitFormComponent,
     BlockedRequestsComponent
   ],

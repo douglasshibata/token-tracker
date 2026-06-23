@@ -7,6 +7,8 @@ import { Component } from '@angular/core';
       <a routerLink="/dashboard">Dashboard</a> |
       <a routerLink="/productivity">Productivity</a> |
       <a routerLink="/report">Monthly Report</a> |
+      <a routerLink="/coverage">Coverage Analysis</a> |
+      <a routerLink="/logs">Request Logs</a> |
       <a routerLink="/limits">Hard Limits</a> |
       <a routerLink="/blocked">Blocked Requests</a>
     </nav>

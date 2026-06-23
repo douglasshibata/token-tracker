@@ -1,33 +1,38 @@
-# Token Tracker & Request Interceptor
+# Dual-Mode LLM Tracker & Interceptor
 
-A comprehensive system to track LLM token usage and enforce hard budget limits across multiple AI tools and providers.
+A unified corporate observability platform for tracking and limiting LLM usage through two modes:
 
-## Architecture
+## 1. Gateway Mode (Active Control)
+Applications explicitly route through the gateway.
+- **Base URL:** `http://localhost:8000/v1`
+- **Supported:** OpenAI-compatible tools (Cursor, Python SDK, etc.)
+- **Features:** Budget enforcement (429 blocking), centralized keys.
 
-- **Backend Proxy (FastAPI):** Intercepts API requests, performs token estimation, enforces budgets, and logs productivity metrics.
-- **Database (TimescaleDB/PostgreSQL):** Stores time-series data of API calls, sessions, and budget configurations.
-- **Frontend Dashboard (Angular):** Visualizes spending, productivity (Generation Ratio), and allows setting hard limits.
-- **Docker Orchestration:** Simple deployment using `docker-compose`.
+## 2. Intercept Mode (Passive Visibility)
+Transparently captures direct traffic to providers.
+- **Sub-mode A (MITM):** Uses `mitmproxy` to decrypt and parse network traffic.
+- **Sub-mode B (SDK Wrapper):** Code-level monkeypatching of LLM libraries.
+- **Sub-mode C (Mirror):** Read-only packet sniffing for discovery.
+- **`logq` CLI Tool:** High-performance Go-based log analyzer for deep-diving into `.jsonl` traffic.
 
-## Features
+## 🛠️ Setup Guide
 
-- **Hard Blocking:** Automatically stops requests with a 429 error if daily, monthly, or total limits are exceeded.
-- **Productivity Tracking:** Calculates "Generation Ratio" (Output/Input) and detects tool/code generation calls.
-- **Multi-Tool Support:** Intercepts Claude Code CLI, Antigravity IDE, and Kiro IDE.
-- **Multi-Provider support:** Handles Anthropic, Gemini, and Antigravity APIs.
+### Gateway Integration (Example: Python)
+```python
+import openai
+client = openai.OpenAI(
+    base_url="http://localhost:8000/v1",
+    api_key="gw-any-key" # Gateway manages provider keys
+)
+```
 
-## Installation
+### MITM Intercept Setup
+1. Deploy `intercept_mitm.py` as a mitmproxy addon.
+2. Install the generated CA certificate on target machines.
+3. Set `HTTP_PROXY="http://localhost:8080"`.
 
-1.  **Clone the repository.**
-2.  **Configure environment variables:**
-    Copy `backend/.env.example` to `backend/.env` and fill in your API keys.
-3.  **Start the stack:**
-    ```bash
-    docker-compose up -d --build
-    ```
-4.  **Initialize the Database:**
-    The system auto-initializes a default project on startup.
-
-## Usage
-
-See [TUTORIAL.md](./TUTORIAL.md) for detailed instructions on how to point your AI tools to the tracker.
+## 🚀 Deployment
+```bash
+docker-compose up -d
+```
+The database will automatically initialize a default project and admin user.
