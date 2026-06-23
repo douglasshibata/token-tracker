@@ -65,7 +65,7 @@ class UnifiedPipeline:
 
             # 4. Write Unified Log
             request_id = await conn.fetchval("""
-                INSERT INTO requests
+                INSERT INTO api_logs
                 (capture_mode, method, user_id, provider_id, model,
                  request_messages, status, input_tokens, output_tokens,
                  total_cost, latency_ms, source_ip, created_at)

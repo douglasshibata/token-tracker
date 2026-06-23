@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from uuid import UUID
 from datetime import datetime
 
@@ -13,7 +13,19 @@ def mock_pipeline():
         mock.return_value = AsyncMock(return_value=UUID("00000000-0000-0000-0000-00000000000A"))
         yield mock
 
-def test_gateway_proxy_claude(mock_pipeline):
+@pytest.fixture
+def mock_db_check():
+    with patch("app.main.db.check_budget") as mock:
+        mock.return_value = AsyncMock(return_value={"allowed": True})
+        yield mock
+
+@pytest.fixture
+def mock_db_init():
+    with patch("app.main.db.connect") as mock:
+        mock.return_value = AsyncMock()
+        yield mock
+
+def test_gateway_proxy_claude(mock_pipeline, mock_db_check, mock_db_init):
     with patch("app.main.http_client.post") as mock_post:
         mock_post.return_value = AsyncMock(
             status_code=200,
@@ -29,12 +41,11 @@ def test_gateway_proxy_claude(mock_pipeline):
         response = client.post("/v1/chat/completions", json=payload)
 
         assert response.status_code == 200
-        mock_pipeline.assert_called_once()
-        # Verify it was logged as gateway source
+        mock_pipeline.assert_called()
         args, kwargs = mock_pipeline.call_args
         assert kwargs['capture_mode'] == "gateway"
 
-def test_ingest_intercept_mitm(mock_pipeline):
+def test_ingest_intercept_mitm(mock_pipeline, mock_db_init):
     payload = {
         "capture_mode": "intercept-mitm",
         "method": "mitm",

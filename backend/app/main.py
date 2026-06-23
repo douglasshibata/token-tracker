@@ -9,11 +9,13 @@ from .services.database import Database
 from .services.pipeline import UnifiedPipeline
 from .services.vault import vault
 from .services.adapters.claude import ClaudeAdapter
+from .services.gatekeeper import estimate_tokens, calculate_estimated_cost, format_error_response
 from .routes import projects, logs, export
 
 app = FastAPI(title="Dual-Mode LLM Gateway")
 db = Database()
 pipeline = UnifiedPipeline(db)
+# Shared HTTP client for efficiency
 http_client = httpx.AsyncClient()
 
 app.include_router(projects.router, prefix="/v1")
@@ -54,17 +56,34 @@ async def ingest_intercepted_request(payload: dict = Body(...)):
 
 @app.api_route("/v1/chat/completions", methods=["POST"])
 async def gateway_proxy(request: Request):
-    """Active Gateway Mode: OpenAI-compatible endpoint"""
+    """Active Gateway Mode: OpenAI-compatible endpoint with HARD BLOCKING"""
     source_ip = request.client.host if request.client else "127.0.0.1"
-    # Auth would extract user_id from Gateway Key
     user_id = UUID(os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000000"))
 
     body = await request.json()
     model = body.get("model", "claude-3-5-sonnet-20241022")
 
-    # Simple routing logic
-    provider_name = "claude" if "claude" in model else "openai"
+    # 1. PRE-REQUEST BLOCKING LOGIC
+    # Estimate tokens and cost before calling the real API
+    est_tokens = estimate_tokens(body)
+    # Simplified provider determination
+    provider_name = "claude" if "claude" in model else "google"
+    est_cost = calculate_estimated_cost(provider_name, model, est_tokens)
 
+    # Check budget for the user/project
+    budget_status = await db.check_budget(user_id, est_cost)
+    if not budget_status["allowed"]:
+        reason = budget_status["reason"]
+        # Log the blocked attempt
+        await pipeline.ingest_request(
+            capture_mode="gateway", method="proxy", provider_name=provider_name,
+            model=model, user_id=user_id, request_body=body,
+            input_tokens=est_tokens, output_tokens=0, latency_ms=0,
+            timestamp=datetime.utcnow(), source_ip=source_ip, status="blocked"
+        )
+        return JSONResponse(status_code=429, content=format_error_response(provider_name, reason))
+
+    # 2. FORWARD TO PROVIDER
     adapter = adapters.get(provider_name)
     if not adapter:
         return JSONResponse(status_code=400, content={"error": f"No adapter for provider: {provider_name}"})
