@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS api_logs (
     project_id UUID REFERENCES projects(id),
     capture_mode VARCHAR(30) NOT NULL, -- 'gateway', 'intercept-mitm', 'intercept-sdk', 'intercept-mirror'
     method VARCHAR(20),               -- 'proxy', 'mitm'
+    source_type VARCHAR(50),          -- 'claude-cli', 'kiro', 'antigravity', 'cursor', 'api'
     was_enforceable BOOLEAN DEFAULT TRUE,
     was_blocked BOOLEAN DEFAULT FALSE,
 

@@ -34,7 +34,21 @@ async def get_stats(project_id: UUID):
             FROM api_logs
             WHERE project_id = $1
         """, project_id)
-        return dict(row)
+
+        # Source type breakdown
+        source_rows = await conn.fetch("""
+            SELECT source_type, COUNT(*) as count,
+                   COALESCE(SUM(cost), 0) as cost,
+                   COALESCE(SUM(input_tokens + output_tokens), 0) as tokens
+            FROM api_logs
+            WHERE project_id = $1 AND source_type IS NOT NULL
+            GROUP BY source_type
+            ORDER BY count DESC
+        """, project_id)
+
+        result = dict(row)
+        result["by_source"] = [dict(r) for r in source_rows]
+        return result
 
 @router.get("/productivity/{project_id}")
 async def get_productivity(project_id: UUID):

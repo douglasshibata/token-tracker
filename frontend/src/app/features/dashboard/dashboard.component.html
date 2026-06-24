@@ -9,9 +9,36 @@
     <p class="value">{{ stats.total_tokens | number }}</p>
   </div>
 
+  <div class="stat-card">
+    <h3>Total Prompts</h3>
+    <p class="value">{{ stats.total_prompts | number }}</p>
+  </div>
+
   <div class="stat-card danger" [class.active]="stats.blocked_count > 0">
     <h3>Blocked Requests</h3>
     <p class="value">{{ stats.blocked_count }}</p>
     <p class="sub">Stopped by Gatekeeper</p>
   </div>
+</div>
+
+<div class="source-breakdown" *ngIf="stats.by_source && stats.by_source.length > 0">
+  <h3>Usage by AI Tool</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>Prompts</th>
+        <th>Tokens</th>
+        <th>Cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let src of stats.by_source">
+        <td><span class="source-badge" [attr.data-source]="src.source_type">{{ src.source_type || 'unknown' }}</span></td>
+        <td>{{ src.count }}</td>
+        <td>{{ src.tokens | number }}</td>
+        <td>${{ src.cost | number:'1.2-6' }}</td>
+      </tr>
+    </tbody>
+  </table>
 </div>
