@@ -27,16 +27,17 @@ async def export_monthly_report(
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("""
             SELECT
-                DATE(created_at) as date,
-                provider as source,
-                COUNT(id) as total_prompts,
-                SUM(input_tokens) as total_input_tokens,
-                SUM(output_tokens) as total_output_tokens,
-                SUM(cost) as total_cost,
-                SUM(CASE WHEN is_tool_call = TRUE THEN 1 ELSE 0 END) as code_actions
-            FROM api_logs
-            WHERE project_id = $1 AND created_at >= $2 AND created_at < $3
-            GROUP BY DATE(created_at), provider
+                DATE(l.created_at) as date,
+                p.name as source,
+                COUNT(l.id) as total_prompts,
+                SUM(l.input_tokens) as total_input_tokens,
+                SUM(l.output_tokens) as total_output_tokens,
+                SUM(l.cost) as total_cost,
+                SUM(CASE WHEN l.is_tool_call = TRUE THEN 1 ELSE 0 END) as code_actions
+            FROM api_logs l
+            JOIN providers p ON l.provider_id = p.id
+            WHERE l.project_id = $1 AND l.created_at >= $2 AND l.created_at < $3
+            GROUP BY DATE(l.created_at), p.name
             ORDER BY date ASC
         """, UUID(project_id) if len(project_id) == 36 else project_id, start_date, end_date)
 

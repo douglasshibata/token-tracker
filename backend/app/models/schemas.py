@@ -32,12 +32,17 @@ class User(BaseModel):
 
 class LLMRequest(BaseModel):
     id: UUID
+    project_id: UUID
     capture_mode: str
     method: str
-    provider_name: Optional[str] = None
+    provider_id: Optional[UUID] = None
     model: str
     input_tokens: int
     output_tokens: int
-    total_cost: Decimal
+    cost: Decimal
+    was_blocked: bool
+    generation_ratio: Optional[Decimal] = None
+    is_tool_call: bool
+    tool_name: Optional[str] = None
     latency_ms: int
     created_at: datetime
