@@ -152,26 +152,28 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
 
 ### All-in-One Launcher
 
-Create a single script to start everything with tracking enabled:
+Create a single script to start everything with tracking enabled. **Proxy is scoped** — only LLM domains are intercepted; git, npm, and browser traffic pass through unmodified.
 
 ```powershell
 # Save as: Start-TrackedDev.ps1
-# Starts token tracker + launches your IDE with tracking enabled
 
 # 1. Ensure tracker is running
 docker compose up -d
 
-# 2. Start MITM proxy in background (if installed)
-$mitmJob = Start-Job { mitmdump --listen-port 9090 -s "backend\app\services\intercept_mitm.py" --set block_global=false }
+# 2. Start MITM proxy in background (only intercepts LLM domains)
+$mitmJob = Start-Job {
+    mitmdump --listen-port 9090 -s "backend\app\services\intercept_mitm.py" --set block_global=false --allow-hosts "^(api\.anthropic\.com|generativelanguage\.googleapis\.com|.*bedrock-runtime.*\.amazonaws\.com)$"
+}
 
-# 3. Set env vars
+# 3. Set env vars ONLY for IDE launchers (not globally)
 $env:ANTHROPIC_BASE_URL = "http://localhost:8000"
-$env:HTTP_PROXY = "http://localhost:9090"
-$env:HTTPS_PROXY = "http://localhost:9090"
-$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+$env:X_SOURCE = "claude-cli"
 
 Write-Host "Token Tracker ready! Dashboard: http://localhost:4200" -ForegroundColor Green
+Write-Host "Git/npm/browser traffic is NOT affected." -ForegroundColor Yellow
 ```
+
+> **Key design:** The MITM proxy uses `--allow-hosts` to ONLY intercept traffic to LLM API domains (`api.anthropic.com`, `generativelanguage.googleapis.com`, `bedrock-runtime.*.amazonaws.com`). All other HTTPS traffic (GitHub, npm, browsers) passes through untouched — no CONNECT tunnel failures.
 
 ## ✨ Main Features
 - **Dual-Mode Observation:** Supports both proxying (Gateway) and non-intrusive interception (Hooks + MITM).

@@ -152,7 +152,7 @@ Add this complete block to your `$PROFILE` for always-on tracking across all too
 ```powershell
 # === Token Tracker: Always-On LLM Tracking ===
 
-# Claude CLI: Direct gateway
+# Claude CLI: Direct gateway (no proxy needed, uses base URL)
 $env:ANTHROPIC_BASE_URL = "http://localhost:8000"
 $env:X_SOURCE = "claude-cli"
 $env:X_PROJECT_ID = "00000000-0000-0000-0000-000000000000"
@@ -164,15 +164,25 @@ function Start-Antigravity {
     $env:X_SOURCE = "antigravity"
     $env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
     & "$env:LOCALAPPDATA\Programs\Antigravity\Antigravity.exe"
+    # Clean up proxy vars after launch so git/npm aren't affected
+    Remove-Item env:NODE_TLS_REJECT_UNAUTHORIZED -ErrorAction SilentlyContinue
 }
 Set-Alias ag Start-Antigravity
 
 # Kiro launcher with MITM proxy (requires: pip install mitmproxy)
+# The proxy ONLY intercepts LLM API domains (anthropic, google, bedrock)
+# All other traffic (git, npm, browser) passes through unmodified
 function Start-Kiro {
     $env:HTTP_PROXY = "http://localhost:9090"
     $env:HTTPS_PROXY = "http://localhost:9090"
+    $env:NO_PROXY = "localhost,127.0.0.1,github.com,*.github.com,registry.npmjs.org,*.npmjs.org"
     $env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
     & "$env:LOCALAPPDATA\Programs\Kiro\Kiro.exe"
+    # Clean up proxy vars so they don't leak to other commands
+    Remove-Item env:HTTP_PROXY -ErrorAction SilentlyContinue
+    Remove-Item env:HTTPS_PROXY -ErrorAction SilentlyContinue
+    Remove-Item env:NO_PROXY -ErrorAction SilentlyContinue
+    Remove-Item env:NODE_TLS_REJECT_UNAUTHORIZED -ErrorAction SilentlyContinue
 }
 Set-Alias kiro Start-Kiro
 
@@ -185,6 +195,8 @@ function Ensure-TokenTracker {
 }
 Ensure-TokenTracker
 ```
+
+> **Important:** The proxy is ONLY set inside the launcher functions and cleaned up after the IDE starts. Git, npm, and other tools are never affected. The MITM proxy uses `--allow-hosts` to only intercept LLM API domains — everything else passes through untouched.
 
 ---
 
