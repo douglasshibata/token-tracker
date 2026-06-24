@@ -5,6 +5,18 @@ import os
 SCHEMA = """
 -- Unified Corporate LLM Gateway & Intercept Schema
 
+-- Projects
+CREATE TABLE IF NOT EXISTS projects (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    daily_limit DECIMAL(10,2),
+    monthly_limit DECIMAL(10,2),
+    total_limit DECIMAL(10,2),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Providers
 CREATE TABLE IF NOT EXISTS providers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,12 +47,14 @@ CREATE TABLE IF NOT EXISTS gateway_users (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Unified Request Logs
-CREATE TABLE IF NOT EXISTS requests (
+-- Unified Request Logs (api_logs)
+CREATE TABLE IF NOT EXISTS api_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id UUID REFERENCES projects(id),
     capture_mode VARCHAR(30) NOT NULL, -- 'gateway', 'intercept-mitm', 'intercept-sdk', 'intercept-mirror'
     method VARCHAR(20),               -- 'proxy', 'mitm'
     was_enforceable BOOLEAN DEFAULT TRUE,
+    was_blocked BOOLEAN DEFAULT FALSE,
 
     user_id UUID REFERENCES gateway_users(id),
     provider_id UUID REFERENCES providers(id),
@@ -51,7 +65,10 @@ CREATE TABLE IF NOT EXISTS requests (
 
     input_tokens INT DEFAULT 0,
     output_tokens INT DEFAULT 0,
-    total_cost DECIMAL(10,6) DEFAULT 0.0,
+    cost DECIMAL(10,6) DEFAULT 0.0,
+    generation_ratio DECIMAL(10,4),
+    is_tool_call BOOLEAN DEFAULT FALSE,
+    tool_name VARCHAR(100),
 
     latency_ms INT,
     source_ip VARCHAR(45),
@@ -74,7 +91,7 @@ CREATE TABLE IF NOT EXISTS ip_user_mapping (
 -- Deduplication tracking
 CREATE TABLE IF NOT EXISTS request_fingerprints (
     fingerprint VARCHAR(64) PRIMARY KEY, -- SHA256 of (timestamp+model+input_tokens+ip)
-    request_id UUID REFERENCES requests(id),
+    request_id UUID REFERENCES api_logs(id),
     capture_mode VARCHAR(30),
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -92,7 +109,7 @@ CREATE TABLE IF NOT EXISTS endpoint_discovery (
     notes TEXT
 );
 
--- Budgets (Enforced in Gateway Mode)
+-- Budgets (Legacy/Entity based - optional)
 CREATE TABLE IF NOT EXISTS budgets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     entity_type VARCHAR(20), -- 'company', 'department', 'user'
@@ -104,7 +121,8 @@ CREATE TABLE IF NOT EXISTS budgets (
 );
 
 -- Indexes for performance
-CREATE INDEX IF NOT EXISTS idx_requests_mode ON requests(capture_mode, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_logs_mode ON api_logs(capture_mode, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_logs_project ON api_logs(project_id);
 CREATE INDEX IF NOT EXISTS idx_ip_mapping_lookup ON ip_user_mapping(ip_address) WHERE is_active;
 """
 
@@ -117,12 +135,16 @@ async def init_db():
 
         # Seed defaults
         await conn.execute("""
+            INSERT INTO projects (id, name, description)
+            VALUES ('00000000-0000-0000-0000-000000000000', 'Default Project', 'Auto-created default project')
+            ON CONFLICT DO NOTHING;
+
             INSERT INTO gateway_users (id, display_name, email, role)
             VALUES ('00000000-0000-0000-0000-000000000000', 'System Admin', 'admin@company.com', 'admin')
             ON CONFLICT DO NOTHING;
 
             INSERT INTO providers (name, base_url) VALUES
-            ('anthropic', 'https://api.anthropic.com'),
+            ('claude', 'https://api.anthropic.com'),
             ('google', 'https://generativelanguage.googleapis.com')
             ON CONFLICT DO NOTHING;
         """)

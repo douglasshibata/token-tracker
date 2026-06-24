@@ -34,7 +34,10 @@ class UnifiedPipeline:
         latency_ms: int,
         timestamp: datetime,
         source_ip: str,
-        status: str = "success"
+        status: str = "success",
+        project_id: Optional[UUID] = None,
+        is_tool_call: bool = False,
+        tool_name: Optional[str] = None
     ):
         if not self.db.pool: await self.db.connect()
 
@@ -60,30 +63,37 @@ class UnifiedPipeline:
                 if not user_id:
                     user_id = UUID('00000000-0000-0000-0000-000000000000')
 
-            # 3. Calculate Cost
-            total_cost = (Decimal(input_tokens + output_tokens) / Decimal(1_000_000)) * Decimal(5.0)
+            # 3. Project Resolution
+            if not project_id:
+                project_id = UUID('00000000-0000-0000-0000-000000000000')
 
-            # 4. Write Unified Log
+            # 4. Calculate Cost and Metrics
+            total_cost = (Decimal(input_tokens + output_tokens) / Decimal(1_000_000)) * Decimal(5.0)
+            gen_ratio = Decimal(output_tokens) / Decimal(max(input_tokens, 1))
+
+            # 5. Write Unified Log
             request_id = await conn.fetchval("""
                 INSERT INTO api_logs
-                (capture_mode, method, user_id, provider_id, model,
-                 request_messages, status, input_tokens, output_tokens,
-                 total_cost, latency_ms, source_ip, created_at)
-                VALUES ($1, $2, $3, (SELECT id FROM providers WHERE name = $4), $5,
-                        $6, $7, $8, $9, $10, $11, $12, $13)
+                (capture_mode, method, project_id, user_id, provider_id, model,
+                 request_messages, status, was_blocked, input_tokens, output_tokens,
+                 cost, generation_ratio, is_tool_call, tool_name,
+                 latency_ms, source_ip, created_at)
+                VALUES ($1, $2, $3, $4, (SELECT id FROM providers WHERE name = $5), $6,
+                        $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                 RETURNING id
-            """, capture_mode, method, user_id, provider_name, model,
-            json.dumps(request_body.get("messages", [])), status, input_tokens, output_tokens,
-            total_cost, latency_ms, source_ip, timestamp)
+            """, capture_mode, method, project_id, user_id, provider_name, model,
+            json.dumps(request_body.get("messages", [])), status, status == "blocked", input_tokens, output_tokens,
+            total_cost, gen_ratio, is_tool_call, tool_name,
+            latency_ms, source_ip, timestamp)
 
-            # 5. Store Fingerprint
+            # 6. Store Fingerprint
             await conn.execute("""
                 INSERT INTO request_fingerprints (fingerprint, request_id, capture_mode)
                 VALUES ($1, $2, $3)
             """, fingerprint, request_id, capture_mode)
 
-            # 6. Budget Enforcement (Gateway Mode Only)
-            if capture_mode == "gateway":
+            # 7. Budget Enforcement (Gateway Mode Only)
+            if capture_mode == "gateway" and status != "blocked":
                 await conn.execute("""
                     UPDATE budgets
                     SET cost_used = cost_used + $1
