@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { LogsService } from '../../core/services/logs.service';
 
 @Component({
+  standalone: false,
   selector: 'app-blocked-list',
   templateUrl: './blocked-list.component.html'
 })

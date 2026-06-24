@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 @Component({
+  standalone: false,
   selector: 'app-monthly-report',
   templateUrl: './monthly-report.component.html',
   styleUrls: ['./monthly-report.component.css']

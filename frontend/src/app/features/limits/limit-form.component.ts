@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { BudgetService } from '../../core/services/budget.service';
 
 @Component({
+  standalone: false,
   selector: 'app-limit-form',
   templateUrl: './limit-form.component.html',
   styleUrls: ['./limit-form.component.css']
