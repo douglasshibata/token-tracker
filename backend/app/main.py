@@ -10,7 +10,7 @@ from .services.pipeline import UnifiedPipeline
 from .services.vault import vault
 from .services.adapters.claude import ClaudeAdapter
 from .services.gatekeeper import estimate_tokens, calculate_estimated_cost, format_error_response
-from .routes import projects, logs, export
+from .routes import projects, logs, export, billing
 
 app = FastAPI(title="Dual-Mode LLM Gateway")
 db = Database()
@@ -21,6 +21,7 @@ http_client = httpx.AsyncClient()
 app.include_router(projects.router, prefix="/v1")
 app.include_router(logs.router, prefix="/v1")
 app.include_router(export.router, prefix="/v1")
+app.include_router(billing.router, prefix="/v1")
 
 adapters = {
     "claude": ClaudeAdapter(),
@@ -117,13 +118,34 @@ async def ingest_intercepted_request(payload: dict = Body(...)):
 async def anthropic_gateway_proxy(request: Request):
     """Active Gateway Mode: Anthropic /v1/messages endpoint (used by Claude CLI, Kiro)"""
     source_ip = request.client.host if request.client else "127.0.0.1"
-    user_id = UUID(os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000000"))
+    # Resolve user_id from headers or use default
+    user_id_raw = request.headers.get("X-User-ID", os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000000"))
+    try:
+        user_id = UUID(user_id_raw)
+    except (ValueError, AttributeError):
+        user_id = UUID("00000000-0000-0000-0000-000000000000")
 
     body = await request.json()
     model = body.get("model", "claude-sonnet-4-20250514")
 
     # Detect source type from headers
     source_type = detect_source_tool(request)
+
+    # 0. Subscription Check
+    if not db.pool: await db.connect()
+    async with db.pool.acquire() as conn:
+        user_row = await conn.fetchrow("SELECT subscription_tier FROM gateway_users WHERE id = $1", user_id)
+        if user_row and user_row['subscription_tier'] == 'free':
+            # Check daily request count for free users
+            count = await conn.fetchval(
+                "SELECT COUNT(*) FROM api_logs WHERE user_id = $1 AND created_at >= CURRENT_DATE",
+                user_id
+            )
+            if count >= 100:
+                return JSONResponse(status_code=429, content={
+                    "type": "error",
+                    "error": {"type": "rate_limit_error", "message": "Free tier limit reached (100 req/day). Please upgrade to Pro."}
+                })
 
     # Estimate tokens from messages
     est_tokens = estimate_tokens(body)
@@ -246,7 +268,12 @@ async def anthropic_gateway_proxy(request: Request):
 async def gateway_proxy(request: Request):
     """Active Gateway Mode: OpenAI-compatible endpoint with HARD BLOCKING"""
     source_ip = request.client.host if request.client else "127.0.0.1"
-    user_id = UUID(os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000000"))
+    # Resolve user_id from headers or use default
+    user_id_raw = request.headers.get("X-User-ID", os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000000"))
+    try:
+        user_id = UUID(user_id_raw)
+    except (ValueError, AttributeError):
+        user_id = UUID("00000000-0000-0000-0000-000000000000")
 
     body = await request.json()
     model = body.get("model", "claude-3-5-sonnet-20241022")

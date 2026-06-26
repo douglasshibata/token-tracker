@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS gateway_users (
     email VARCHAR(255),
     role VARCHAR(20) DEFAULT 'user',
     department VARCHAR(100),
+    subscription_tier VARCHAR(20) DEFAULT 'free', -- 'free', 'pro', 'enterprise'
+    balance DECIMAL(10,2) DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
