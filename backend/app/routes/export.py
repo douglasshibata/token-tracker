@@ -14,8 +14,17 @@ async def export_monthly_report(
     project_id: str,
     year: int,
     month: int,
-    format: str = "csv"
+    format: str = "csv",
+    user_id: str = "00000000-0000-0000-0000-000000000000" # Mocked user id
 ):
+    # Pro-only feature check for Excel
+    if format == "excel":
+        if not db.pool: await db.connect()
+        async with db.pool.acquire() as conn:
+            tier = await conn.fetchval("SELECT subscription_tier FROM gateway_users WHERE id = $1", UUID(user_id))
+            if tier != 'pro' and tier != 'enterprise':
+                raise HTTPException(status_code=403, detail="Excel export is a Pro feature. Please upgrade your subscription.")
+
     start_date = datetime(year, month, 1)
     # Simple end date calculation
     if month == 12:
