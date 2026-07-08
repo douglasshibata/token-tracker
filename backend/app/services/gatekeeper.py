@@ -47,7 +47,12 @@ def calculate_estimated_cost(provider: str, model: str, input_tokens: int) -> fl
 async def check_budget_status(db, project_id: str, estimated_max_cost: float) -> Dict[str, Any]:
     """Check if the project has enough budget for the estimated cost"""
     # This will call the database service
-    return await db.check_budget(project_id, estimated_max_cost)
+    status = await db.check_budget(project_id, estimated_max_cost)
+
+    if status.get("allowed") and status.get("warning"):
+        logger.warning(f"BUDGET_WARNING: Project {project_id} has used >90% of its budget.")
+
+    return status
 
 def format_error_response(provider: str, reason: str) -> Dict[str, Any]:
     """Format a 429 error response mimicking the target provider's style"""

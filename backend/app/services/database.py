@@ -36,4 +36,9 @@ class Database:
             if cost_limit and (float(cost_used) + estimated_cost) > float(cost_limit):
                 return {"allowed": False, "reason": f"Budget limit (${cost_limit}) exceeded."}
 
-            return {"allowed": True}
+            # Warning if usage > 90%
+            warning = False
+            if cost_limit and (float(cost_used) + estimated_cost) > (float(cost_limit) * 0.9):
+                warning = True
+
+            return {"allowed": True, "warning": warning}
