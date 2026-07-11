@@ -83,3 +83,30 @@ Requires a persistent TimescaleDB instance and Redis for real-time limit enforce
 
 ## License
 MIT License
+
+---
+
+## 🛠️ Project Deep Dive & Technical Guide
+
+### 🎯 Main Purpose
+AI FinOps & Observability platform tracking token consumption, model costs, and billing thresholds.
+
+### 🧰 Tecnologias Utilizadas (Tech Stack)
+- **Primary Technologies:** Angular 19.2.2, Docker / Docker Compose, FastAPI, Go 1.24.3, Node.js / npm, Python 3.12
+- **Deployment Strategy:** Container-ready with standard Docker/Docker Compose integrations where applicable.
+
+### 🚀 Como Implantar e Executar (How to Deploy & Run)
+#### Frontend (Angular / Node.js)
+1. Navigate to the frontend directory.
+2. Install dependencies: `npm install`.
+3. Run development server: `npm start` or `npm run dev`.
+
+#### Python Engine / FastAPI
+1. Install dependencies: `pip install -r requirements.txt`.
+2. Run the server/script: `uvicorn main:app --reload` or `python main.py`.
+
+#### Go CLI / Service
+1. Build the module: `go build`.
+2. Execute: `./token-tracker` (or project executable name).
+
+---
